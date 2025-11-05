@@ -7,13 +7,20 @@ from sklearn.utils import shuffle
 import config
 
 def lcg(size, seed=20, a=1103513245, c=12345, m=2**32):
-    """线性同余发生器 (LCG) 生成伪随机数序列"""
-    x = np.zeros(size, dtype=np.uint32)
-    x[0] = seed
+    """线性同余发生器 (LCG) 生成伪随机数序列
+
+    说明：当模数 m > 2**32 时，使用 uint64 存储以避免溢出。
+    """
+    # 选择合适的存储精度
+    use_uint64 = int(m) > np.iinfo(np.uint32).max
+    dtype = np.uint64 if use_uint64 else np.uint32
+
+    x = np.zeros(size, dtype=dtype)
+    x[0] = dtype(seed)
     for i in range(1, size):
-        # 使用 Python int 计算再取模，最后安全转回 uint32
+        # 使用 Python int 计算再取模，最后安全写回到对应 dtype
         value = (int(a) * int(x[i-1]) + int(c)) % int(m)
-        x[i] = np.uint32(value)
+        x[i] = dtype(value)
     return x
 
 def _gen_sequences(size, moduli, seed_offset=0):
