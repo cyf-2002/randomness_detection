@@ -1,0 +1,37 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="17">
+            <item index="0" class="java.lang.String" itemvalue="pymdi" />
+            <item index="1" class="java.lang.String" itemvalue="shapely" />
+            <item index="2" class="java.lang.String" itemvalue="geopy" />
+            <item index="3" class="java.lang.String" itemvalue="folium" />
+            <item index="4" class="java.lang.String" itemvalue="eviltransform" />
+            <item index="5" class="java.lang.String" itemvalue="netifaces" />
+            <item index="6" class="java.lang.String" itemvalue="hdmap_base" />
+            <item index="7" class="java.lang.String" itemvalue="data_warehouse_py" />
+            <item index="8" class="java.lang.String" itemvalue="psycopg2-binary" />
+            <item index="9" class="java.lang.String" itemvalue="ditu" />
+            <item index="10" class="java.lang.String" itemvalue="requests" />
+            <item index="11" class="java.lang.String" itemvalue="loguru" />
+            <item index="12" class="java.lang.String" itemvalue="mpp_python_sdk" />
+            <item index="13" class="java.lang.String" itemvalue="tqdm" />
+            <item index="14" class="java.lang.String" itemvalue="tos_python_sdk" />
+            <item index="15" class="java.lang.String" itemvalue="debugpy" />
+            <item index="16" class="java.lang.String" itemvalue="pyproj" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyShadowingBuiltinsInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <option name="ignoredNames">
+        <list>
+          <option value="id" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
