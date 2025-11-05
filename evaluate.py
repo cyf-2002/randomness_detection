@@ -4,14 +4,15 @@
 """
 import numpy as np
 import tensorflow as tf
-from dataset import generate_dataset
+from dataset import generate_dataset_split
 import config
 
 AO_RANGE = (45, 55)
 
 def detect_randomness(model_path):
     model = tf.keras.models.load_model(model_path)
-    X, y = generate_dataset()
+    # 评估统一使用验证集，避免评估时用到训练数据
+    X, y = generate_dataset_split('val')
     y_pred = model.predict(X).ravel() * 100  # 转换为百分比
 
     AO_true = np.mean(y_pred[y == 0])   # 真随机数平均输出

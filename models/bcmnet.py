@@ -3,7 +3,7 @@
 论文结构：CNN → Bi-GRU → Multihead Attention → Dense → Sigmoid
 """
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow import layers, models
 import config
 
 def build_bcmnet(input_shape=(config.WINDOW_SIZE, 1)):
@@ -21,9 +21,17 @@ def build_bcmnet(input_shape=(config.WINDOW_SIZE, 1)):
     x = layers.Bidirectional(layers.GRU(config.GRU_UNITS, return_sequences=True))(x)
 
     # --- 多头注意力机制: 全局依赖捕获 ---
-    attn = layers.MultiHeadAttention(num_heads=config.ATTENTION_HEADS,
-                                     key_dim=config.GRU_UNITS)(x, x)
-    x = layers.Add()([x, attn])  # 残差连接
+    # 注意：Bi-GRU 输出维度为 2 * GRU_UNITS（双向），残差相加需要维度一致
+    feat_dim = x.shape[-1]
+    assert feat_dim is not None, "Feature dim must be known at build time"
+    key_dim = int(feat_dim) // int(config.ATTENTION_HEADS)
+    attn = layers.MultiHeadAttention(
+        num_heads=config.ATTENTION_HEADS,
+        key_dim=key_dim,
+        output_shape=feat_dim,
+        dropout=0.1,
+    )(x, x)
+    x = layers.Add()([x, attn])  # 残差连接（维度已匹配）
     x = layers.LayerNormalization()(x)
 
     # --- 全连接分类层 ---
