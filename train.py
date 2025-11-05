@@ -3,7 +3,7 @@
 加载数据 -> 构建 BCM-Net -> 训练 -> 保存最优模型
 """
 import tensorflow as tf
-from dataset import generate_dataset_split
+from dataset import generate_group_dataset
 from models.bcmnet import build_bcmnet
 import config
 
@@ -11,9 +11,9 @@ def train_model():
     # 设定随机种子，增强可复现性
     tf.keras.utils.set_random_seed(config.SEED)
 
-    # 使用无泄漏分割的数据生成（训练与验证使用独立序列）
-    X_train, y_train = generate_dataset_split('train')
-    X_val, y_val = generate_dataset_split('val')
+    # 组级数据：每类 2^18 组，混合后 8:2 划分
+    X_train, y_train = generate_group_dataset('train')
+    X_val, y_val = generate_group_dataset('val')
 
     model = build_bcmnet()
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=config.LEARNING_RATE),

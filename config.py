@@ -30,3 +30,15 @@ LCG_MODULI = [2 ** 26, 2 ** 28, 2 ** 30, 2 ** 32, 2 ** 34]
 SPLIT_MODE = 'separate_seeds'  # 可选：'separate_seeds' | 'disjoint_ranges'
 TRAIN_SEED_OFFSET = 0
 VAL_SEED_OFFSET = 1000
+
+# 组级数据规模（按论文）
+GROUPS_PER_CLASS = 2 ** 18
+TEST_GROUPS_TOTAL = 65536
+
+# 快速跑（sanity check）开关：设置环境变量 QUICK_RUN=1 启用
+# 可选覆盖值：QUICK_GROUPS_PER_CLASS、QUICK_TEST_GROUPS_TOTAL、QUICK_EPOCHS、QUICK_BATCH_SIZE
+if os.getenv("QUICK_RUN", "0").lower() in ("1", "true", "yes"): 
+	GROUPS_PER_CLASS = int(os.getenv("QUICK_GROUPS_PER_CLASS", 2 ** 12))  # 默认每类 4096 组
+	TEST_GROUPS_TOTAL = int(os.getenv("QUICK_TEST_GROUPS_TOTAL", 1024))   # 默认测试 1024 组
+	EPOCHS = int(os.getenv("QUICK_EPOCHS", 2))                            # 默认训练 2 轮
+	BATCH_SIZE = int(os.getenv("QUICK_BATCH_SIZE", 128))                  # 默认批大小 128
