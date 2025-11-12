@@ -12,7 +12,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
+layers = keras.layers
 import matplotlib.pyplot as plt
 
 # 设置随机种子以确保可重现性
@@ -25,12 +25,30 @@ DATA_DIR = "data"
 MODEL_DIR = "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-BATCH_SIZE = 256
-EPOCHS = 100
-LEARNING_RATE = 0.001
+BATCH_SIZE = 64      # 保持小 batch
+EPOCHS = 200         # 增加轮数
+LEARNING_RATE = 0.0005  # 进一步降低学习率
 WINDOW_SIZE = 256
 NUM_HEADS = 4
 ATTENTION_DIM = 256
+
+def add_positional_encoding(x):
+    """Add sinusoidal positional encoding to input sequence."""
+    batch_size, seq_len, d_model = tf.shape(x)[0], tf.shape(x)[1], tf.shape(x)[2]
+    
+    pos = tf.range(seq_len, dtype=tf.float32)[:, None]
+    i = tf.range(d_model, dtype=tf.float32)[None, :]
+    
+    angle_rates = 1 / tf.pow(10000.0, (2 * (i // 2)) / tf.cast(d_model, tf.float32))
+    angle_rads = pos * angle_rates
+    
+    sines = tf.sin(angle_rads[:, 0::2])
+    cosines = tf.cos(angle_rads[:, 1::2])
+    
+    pos_encoding = tf.concat([sines, cosines], axis=-1)
+    pos_encoding = pos_encoding[None, :, :]
+    
+    return x + pos_encoding
 
 def create_bcm_net(input_shape=(256, 1)):
     """创建 BCM-Net 网络"""
@@ -43,57 +61,60 @@ def create_bcm_net(input_shape=(256, 1)):
     x = layers.Conv1D(filters=64, kernel_size=3, padding='same')(inputs)
     x = layers.BatchNormalization()(x)
     x = layers.PReLU()(x)
-    x = layers.Dropout(0.3)(x)
+    x = layers.Dropout(0.1)(x)  # 降低 dropout
     
-    # 第二层卷积
+    # Layer 2: kernel=5, channels=64
     x = layers.Conv1D(filters=64, kernel_size=5, padding='same')(x)
     x = layers.BatchNormalization()(x)
     x = layers.PReLU()(x)
-    x = layers.Dropout(0.3)(x)
+    x = layers.Dropout(0.1)(x)
     
-    # 第三层卷积
+    # Layer 3: kernel=5, channels=64
     x = layers.Conv1D(filters=64, kernel_size=5, padding='same')(x)
     x = layers.BatchNormalization()(x)
     x = layers.PReLU()(x)
-    x = layers.Dropout(0.3)(x)
+    x = layers.Dropout(0.1)(x)
+    
+    # ===== 扩展通道到 256（论文隐含需求）=====
+    x = layers.Conv1D(filters=256, kernel_size=1, padding='same', name='channel_expand')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.PReLU()(x)
+    x = layers.Dropout(0.05)(x)
     
     # ===== Bi-GRU 模块 =====
-    gru_forward = layers.GRU(64, return_sequences=True, dropout=0.3)
-    gru_backward = layers.GRU(64, return_sequences=True, dropout=0.3, go_backwards=True)
+    gru_units = 128
+    gru_forward = layers.GRU(gru_units, return_sequences=True, dropout=0.1, recurrent_dropout=0.05)
+    gru_backward = layers.GRU(gru_units, return_sequences=True, dropout=0.1, recurrent_dropout=0.05, go_backwards=True)
     
     forward_output = gru_forward(x)
     backward_output = gru_backward(x)
-    
-    # 拼接正向和反向输出
     x = layers.Concatenate()([forward_output, backward_output])
     
-    # ===== Multi-Head Attention 模块 =====
-    # 线性变换得到 Q, K, V
-    query = layers.Dense(ATTENTION_DIM)(x)
-    key = layers.Dense(ATTENTION_DIM)(x)
-    value = layers.Dense(ATTENTION_DIM)(x)
+    # ===== 位置编码（论文明确要求）=====
+    x = add_positional_encoding(x)
     
-    # 多头注意力
+    # ===== Multi-Head Attention 模块（论文明确要求）=====
     attention_output = layers.MultiHeadAttention(
         num_heads=NUM_HEADS,
-        key_dim=ATTENTION_DIM // NUM_HEADS,
+        key_dim=64,  # 256 / 4
         dropout=0.1
-    )(query, key, value)
+    )(x, x, x)
     
-    # 残差连接
+    # 残差连接 + LayerNorm
     x = layers.Add()([x, attention_output])
     x = layers.LayerNormalization()(x)
     
     # 全局平均池化
     x = layers.GlobalAveragePooling1D()(x)
     
-    # ===== 全连接层 =====
+    # ===== 全连接层（论文描述）=====
     x = layers.Dense(128, activation='relu')(x)
-    x = layers.Dropout(0.5)(x)
-    x = layers.Dense(64, activation='relu')(x)
+    x = layers.BatchNormalization()(x)  # 添加 BN 提高稳定性
     x = layers.Dropout(0.3)(x)
+    x = layers.Dense(64, activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.2)(x)
     
-    # 输出层 (二分类)
     outputs = layers.Dense(1, activation='sigmoid')(x)
     
     model = keras.Model(inputs=inputs, outputs=outputs)
@@ -123,18 +144,18 @@ def load_data():
 
 def create_callbacks():
     """创建训练回调函数"""
-    callbacks = [
-        keras.callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=15,
-            restore_best_weights=True,
-            verbose=1
-        ),
+    return [
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss',
             factor=0.5,
-            patience=10,
-            min_lr=1e-6,
+            patience=10,       # 耐心一点
+            min_lr=1e-7,
+            verbose=1
+        ),
+        keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=25,       # 更耐心
+            restore_best_weights=True,
             verbose=1
         ),
         keras.callbacks.ModelCheckpoint(
@@ -145,7 +166,6 @@ def create_callbacks():
             verbose=1
         )
     ]
-    return callbacks
 
 def plot_training_history(history):
     """绘制训练历史"""
@@ -175,10 +195,8 @@ def evaluate_model(model, X_test, y_test):
     """评估模型性能"""
     print("\nEvaluating model on test set...")
     
-    # 预测
     y_pred = model.predict(X_test, batch_size=BATCH_SIZE)
     
-    # 计算准确率
     from sklearn.metrics import accuracy_score, classification_report
     
     y_pred_binary = (y_pred > 0.5).astype(int)
